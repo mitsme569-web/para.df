@@ -6,6 +6,7 @@ export const books = pgTable('books', {
   fingerprint: text('fingerprint').unique().notNull(),
   title: text('title').notNull(),
   fileName: text('file_name').notNull(),
+  genre: text('genre'),
   coverUrl: text('cover_url'),
   pdfKey: text('pdf_key').notNull(),
   pageCount: integer('page_count').notNull(),

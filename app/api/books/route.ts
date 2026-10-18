@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { books } from '@/lib/db/schema'
 import { desc } from 'drizzle-orm'
+import { classifyBookGenre } from '@/lib/genre'
 
 // GET /api/books — list all books
 export async function GET() {
@@ -24,12 +25,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    const genre = body.genre || classifyBookGenre({ title, fileName })
+
     const [book] = await db
       .insert(books)
       .values({
         fingerprint,
         title,
         fileName,
+        genre,
         coverUrl: coverUrl || null,
         pdfKey,
         pageCount,

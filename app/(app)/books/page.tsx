@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { UploadCard } from '@/components/books/upload-card'
 import { GenreFilter, type Genre } from '@/components/books/genre-filter'
 import { BookCard } from '@/components/books/book-card'
 import { EmptyState } from '@/components/books/empty-state'
 import { useBooks } from '@/hooks/use-books'
+import { classifyBookGenre } from '@/lib/genre'
 import { cn } from '@/lib/utils'
 
 export default function BooksPage() {
@@ -14,8 +15,14 @@ export default function BooksPage() {
   const [activeGenre, setActiveGenre] = useState<Genre>('All')
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Genre filter — visual only for now (classification coming later)
-  const filtered = books
+  // Filter books by active genre (auto-classified or explicit)
+  const filtered = useMemo(() => {
+    if (activeGenre === 'All') return books
+    return books.filter((book) => {
+      const genre = classifyBookGenre(book)
+      return genre.toLowerCase() === activeGenre.toLowerCase()
+    })
+  }, [books, activeGenre])
 
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({
@@ -80,7 +87,7 @@ export default function BooksPage() {
               <Loader2 className="h-6 w-6 text-white/30 animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <EmptyState />
+            <EmptyState genre={activeGenre} onClearFilter={() => setActiveGenre('All')} />
           ) : (
             <div className="relative group/scroll">
               <button
@@ -108,6 +115,7 @@ export default function BooksPage() {
                     key={book.id}
                     id={book.id}
                     title={book.title}
+                    genre={classifyBookGenre(book)}
                     coverUrl={book.coverUrl}
                     currentPage={book.lastPage}
                     pageCount={book.pageCount}

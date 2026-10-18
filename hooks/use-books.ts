@@ -7,6 +7,7 @@ export interface BookData {
   fingerprint: string
   title: string
   fileName: string
+  genre?: string | null
   coverUrl: string | null
   pdfKey: string
   pageCount: number
