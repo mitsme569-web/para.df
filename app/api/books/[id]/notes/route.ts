@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureStickyNoteRotationColumn } from '@/lib/db'
 import { stickyNotes } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
@@ -8,6 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    await ensureStickyNoteRotationColumn()
     const { id } = await params
     const notes = await db.select().from(stickyNotes).where(eq(stickyNotes.bookId, id))
     return NextResponse.json(notes)
@@ -22,9 +23,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    await ensureStickyNoteRotationColumn()
     const { id } = await params
     const body = await request.json()
-    const { page, content, x, y, width, height, bgColor, textColor, fontSize, kind } = body
+    const { page, content, x, y, width, height, rotation, bgColor, textColor, fontSize, kind } = body
     
     if (page === undefined || x === undefined || y === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -38,6 +40,7 @@ export async function POST(
       y,
       width: width || 0.2,
       height: height || 0.15,
+      rotation: rotation || 0,
       bgColor: bgColor || '#FFFF00',
       textColor: textColor || '#000000',
       fontSize: fontSize || 14,

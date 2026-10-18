@@ -7,7 +7,8 @@ import {
   ZoomIn, ZoomOut, Minimize2, Eye, StickyNote, PanelLeftClose, PanelLeftOpen, Search,
   ChevronLeft, ChevronRight,
   Send, Type, Bold, Underline, Highlighter, Pen, X, Eraser, FileMinus, Undo2, Redo2,
-  Save, FolderOpen, MoreVertical, Trash2, GripHorizontal,
+  Save, FolderOpen, MoreVertical, Trash2, GripHorizontal, RotateCw,
+  Sparkles, Copy, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -25,6 +26,7 @@ interface GlyphBox { x: number; y: number; w: number; h: number }
 interface StickyNoteData {
   id: string; page: number; content: string
   x: number; y: number; width: number; height: number
+  rotation?: number
   bgColor: string; textColor: string; fontSize: number
   kind?: 'note' | 'textbox'
 }
@@ -34,6 +36,15 @@ interface HighlightData {
 }
 interface SelectionState {
   x: number; y: number; text: string; rects: Rect[]; page: number; below: boolean
+  boundingRect?: { left: number; top: number; right: number; bottom: number }
+}
+interface MeaningData {
+  word: string
+  text: string
+  x: number
+  y: number
+  isExplanation?: boolean
+  loading?: boolean
 }
 interface DrawingStroke {
   id: string
@@ -269,7 +280,7 @@ export default function BookViewerPage() {
   const changeZoom = useCallback((newScale: number | ((prev: number) => number)) => {
     setScale(curr => {
       const next = typeof newScale === 'function' ? newScale(curr) : newScale
-      const clamped = Math.max(0.5, Math.min(3, Math.round(next * 100) / 100))
+      const clamped = Math.max(0.5, Math.min(5.0, Math.round(next * 100) / 100))
       if (clamped === curr) return curr
       const el = centerRef.current
       if (el && curr > 0) {
@@ -289,10 +300,20 @@ export default function BookViewerPage() {
 
   const [selection, setSelection] = useState<SelectionState | null>(null)
   const [activeColor, setActiveColor] = useState(HIGHLIGHT_COLORS[0])
-  const [toolsOpen, setToolsOpen] = useState(false)
+  const [penToolsOpen, setPenToolsOpen] = useState(false)
   const [eraseMode, setEraseMode] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [hlThickness, setHlThickness] = useState(1)
+
+  const togglePenTools = useCallback(() => {
+    setPenToolsOpen(prev => {
+      if (prev) {
+        setPenMode(false)
+        setPaletteOpen(false)
+      }
+      return !prev
+    })
+  }, [])
 
   // Pen tool (freehand drawing) states
   const [penMode, setPenMode] = useState(false)
@@ -301,7 +322,36 @@ export default function BookViewerPage() {
   const [penEraseMode, setPenEraseMode] = useState(false)
   const [drawings, setDrawings] = useState<DrawingStroke[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [meaning, setMeaning] = useState<{ word: string; text: string; x: number; y: number } | null>(null)
+  const [meaning, setMeaning] = useState<MeaningData | null>(null)
+
+  const getSidewaysPosition = useCallback((bb?: { left: number; top: number; right: number; bottom: number }) => {
+    const cardW = 350
+    const cardH = 220
+    const margin = 16
+
+    if (!bb) {
+      return {
+        x: Math.max(16, window.innerWidth - cardW - 24),
+        y: 72,
+      }
+    }
+
+    // Determine horizontal position: prefer placing sideways to the right
+    let x = bb.right + margin
+    if (x + cardW > window.innerWidth - 16) {
+      // If right side would overflow screen, try placing to the left of the selection
+      if (bb.left - cardW - margin > 16) {
+        x = bb.left - cardW - margin
+      } else {
+        // Dock to right side with padding
+        x = Math.max(16, window.innerWidth - cardW - 20)
+      }
+    }
+
+    // Vertically: align with top of selection, strictly clamped below the top bar (min 68px)
+    let y = Math.max(68, Math.min(window.innerHeight - cardH - 24, bb.top))
+    return { x, y }
+  }, [])
   const [journalOpen, setJournalOpen] = useState(false)
   const [allNotes, setAllNotes] = useState<StickyNoteData[]>([])
   const [allHighlights, setAllHighlights] = useState<HighlightData[]>([])
@@ -499,6 +549,27 @@ export default function BookViewerPage() {
   const prevPage = useCallback(() => goToPage(currentPage - 1), [currentPage, goToPage])
   const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage])
 
+  const [pageInput, setPageInput] = useState(String(currentPage || 1))
+  const [isPageInputFocused, setIsPageInputFocused] = useState(false)
+
+  // Sync input value with currentPage when not actively focused/typing
+  useEffect(() => {
+    if (!isPageInputFocused) {
+      setPageInput(String(currentPage))
+    }
+  }, [currentPage, isPageInputFocused])
+
+  const commitPageInput = useCallback(() => {
+    const p = parseInt(pageInput.trim(), 10)
+    if (!isNaN(p)) {
+      const clamped = Math.max(1, Math.min(totalPages || 1, p))
+      goToPage(clamped)
+      setPageInput(String(clamped))
+    } else {
+      setPageInput(String(currentPage))
+    }
+  }, [pageInput, totalPages, goToPage, currentPage])
+
   /* ─── Keyboard: scroll continuously through the stack.
          ArrowDown / PageDown / Space flow past one page into the next. ─── */
   useEffect(() => {
@@ -610,7 +681,15 @@ export default function BookViewerPage() {
     // Flip toolbar below if near the top
     const below = bb.top < 120
     const y = below ? bb.bottom + 12 : Math.max(bb.top - 10, 64)
-    setSelection({ x, y, text, rects, page: selPage, below })
+    setSelection({
+      x, y, text, rects, page: selPage, below,
+      boundingRect: {
+        left: bb.left,
+        top: bb.top,
+        right: bb.right,
+        bottom: bb.bottom,
+      },
+    })
   }, [penMode])
 
   /* ─── Highlight actions ────────────────────────── */
@@ -633,7 +712,14 @@ export default function BookViewerPage() {
   /* ─── Save word / look up meaning ──────────────── */
   const lookupWord = async (mode: 'save' | 'peek') => {
     if (!selection) return
-    const word = selection.text.split(/\s+/).length === 1 ? selection.text : selection.text.trim()
+    const sel = selection
+    const word = sel.text.split(/\s+/).length === 1 ? sel.text : sel.text.trim()
+    const pos = getSidewaysPosition(sel.boundingRect)
+
+    if (mode === 'peek') {
+      setMeaning({ word, text: 'Looking up definition…', x: pos.x, y: pos.y, loading: true })
+    }
+
     try {
       const defRes = await fetch('/api/words/define', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -641,7 +727,7 @@ export default function BookViewerPage() {
       })
       const { meaning: def } = await defRes.json()
       if (mode === 'peek') {
-        setMeaning({ word, text: def || 'No definition found.', x: selection.x, y: selection.y - 44 })
+        setMeaning({ word, text: def || 'No definition found.', x: pos.x, y: pos.y, loading: false })
       }
       if (mode === 'save' || mode === 'peek') {
         await fetch('/api/words', {
@@ -651,7 +737,12 @@ export default function BookViewerPage() {
       }
       window.getSelection()?.removeAllRanges()
       setSelection(null)
-    } catch (err) { console.error(err) }
+    } catch (err) {
+      console.error(err)
+      if (mode === 'peek') {
+        setMeaning({ word, text: 'Could not fetch definition.', x: pos.x, y: pos.y, loading: false })
+      }
+    }
   }
 
   /* ─── AI explanation (Groq) ────────────────────
@@ -659,9 +750,10 @@ export default function BookViewerPage() {
      answer in the peek card. Replaces the old "Send to Claude" external redirect. */
   const explainPassage = async (text: string) => {
     if (!selection) return
-    const { x, y } = selection
+    const sel = selection
+    const pos = getSidewaysPosition(sel.boundingRect)
     setSelection(null)
-    setMeaning({ word: 'Explanation', text: 'Thinking…', x, y })
+    setMeaning({ word: 'AI Explanation', text: 'Thinking…', x: pos.x, y: pos.y, isExplanation: true, loading: true })
     try {
       const res = await fetch('/api/words/explain', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -669,9 +761,9 @@ export default function BookViewerPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Failed to explain passage.')
-      setMeaning({ word: 'Explanation', text: data.explanation || 'No explanation returned.', x, y })
+      setMeaning({ word: 'AI Explanation', text: data.explanation || 'No explanation returned.', x: pos.x, y: pos.y, isExplanation: true, loading: false })
     } catch (err) {
-      setMeaning({ word: 'Explanation', text: err instanceof Error ? err.message : 'Something went wrong.', x, y })
+      setMeaning({ word: 'AI Explanation', text: err instanceof Error ? err.message : 'Something went wrong.', x: pos.x, y: pos.y, isExplanation: true, loading: false })
     }
   }
 
@@ -691,6 +783,7 @@ export default function BookViewerPage() {
         body: JSON.stringify({
           page: pageToUse, content: '',
           x, y, width: size.w, height: size.h,
+          rotation: 0,
           bgColor: isBox ? 'transparent' : NOTE_COLORS[0],
           textColor: '#000000', fontSize: 14, kind,
         }),
@@ -821,7 +914,6 @@ export default function BookViewerPage() {
     try {
       await fetch(`/api/books/${bookId}/highlights`, { method: 'DELETE' })
       setAllHighlights([])
-      setToolsOpen(false)
     } catch (err) { console.error(err) }
   }
   const clearPageHighlights = async () => {
@@ -939,10 +1031,43 @@ export default function BookViewerPage() {
               className="h-7 w-7 rounded flex items-center justify-center text-brand-dark/60 hover:text-brand-dark hover:bg-black/[0.06] disabled:opacity-30 disabled:pointer-events-none">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <input type="number" value={currentPage} min={1} max={totalPages}
-              onChange={e => goToPage(parseInt(e.target.value) || 1)}
-              className="w-11 h-7 rounded bg-brand-teal text-white text-center text-[12px] font-bold focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-            <span className="text-[11px] text-white bg-brand-dark/85 rounded px-1.5 py-0.5 font-semibold">{totalPages}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={pageInput}
+              onFocus={e => {
+                setIsPageInputFocused(true)
+                e.target.select()
+              }}
+              onBlur={() => {
+                setIsPageInputFocused(false)
+                commitPageInput()
+              }}
+              onChange={e => {
+                const val = e.target.value.replace(/[^0-9]/g, '')
+                setPageInput(val)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitPageInput()
+                  ;(e.target as HTMLInputElement).blur()
+                } else if (e.key === 'Escape') {
+                  setPageInput(String(currentPage))
+                  ;(e.target as HTMLInputElement).blur()
+                }
+              }}
+              aria-label="Current page"
+              className="w-12 h-7 rounded bg-brand-teal text-white text-center text-[12px] font-bold focus:outline-none focus:ring-1 focus:ring-white/40 transition-all select-all shadow-inner"
+            />
+            <span
+              onClick={() => goToPage(totalPages)}
+              title="Click to jump to last page"
+              className="text-[11px] text-white bg-brand-dark/85 rounded px-2 py-1 font-semibold cursor-pointer hover:bg-black transition-colors select-none"
+            >
+              {totalPages}
+            </span>
             <button onClick={nextPage} disabled={currentPage >= totalPages} title="Next page"
               className="h-7 w-7 rounded flex items-center justify-center text-brand-dark/60 hover:text-brand-dark hover:bg-black/[0.06] disabled:opacity-30 disabled:pointer-events-none">
               <ChevronRight className="h-4 w-4" />
@@ -952,7 +1077,7 @@ export default function BookViewerPage() {
           <button onClick={() => changeZoom(s => s - 0.25)} className="h-7 w-7 rounded flex items-center justify-center text-brand-dark/50 hover:text-brand-dark hover:bg-black/[0.06]" title="Zoom out">
             <ZoomOut className="h-4 w-4" />
           </button>
-          <span className="text-[11px] text-brand-dark/50 w-10 text-center font-medium">{Math.round(scale * 100)}%</span>
+          <span className="text-[11px] text-brand-dark/50 w-12 text-center font-medium cursor-pointer hover:text-brand-dark" onClick={() => changeZoom(1.0)} title="Click to reset to 100%">{Math.round(scale * 100)}%</span>
           <button onClick={() => changeZoom(s => s + 0.25)} className="h-7 w-7 rounded flex items-center justify-center text-brand-dark/50 hover:text-brand-dark hover:bg-black/[0.06]" title="Zoom in">
             <ZoomIn className="h-4 w-4" />
           </button>
@@ -963,8 +1088,8 @@ export default function BookViewerPage() {
           <button onClick={() => setShowAnnotations(v => !v)} className={cn('h-7 w-7 rounded flex items-center justify-center hover:bg-black/[0.06]', showAnnotations ? 'text-brand-teal' : 'text-brand-dark/40')} title="Toggle annotations">
             <Eye className="h-4 w-4" />
           </button>
-          <button onClick={() => setToolsOpen(v => !v)} className={cn('h-7 w-7 rounded flex items-center justify-center transition-colors', toolsOpen ? 'text-white bg-brand-teal hover:bg-brand-teal-mid' : 'text-brand-dark/50 hover:text-brand-dark hover:bg-black/[0.06]')} title="Highlight tools">
-            <Highlighter className="h-4 w-4" />
+          <button onClick={togglePenTools} className={cn('h-7 w-7 rounded flex items-center justify-center transition-colors', penToolsOpen ? 'text-white bg-brand-teal hover:bg-brand-teal-mid' : 'text-brand-dark/50 hover:text-brand-dark hover:bg-black/[0.06]')} title="Annotation & Drawing tools">
+            <Pen className="h-4 w-4" />
           </button>
           <div className="w-px h-5 bg-brand-dark/10 mx-1" />
           <button onClick={undo} className="h-7 w-7 rounded flex items-center justify-center text-brand-dark/50 hover:text-brand-dark hover:bg-black/[0.06]" title="Undo">
@@ -1088,18 +1213,20 @@ export default function BookViewerPage() {
           )
         })()}
 
-        {/* RIGHT — Tool pill (lavender). High z so the fade tooltip overlays everything. */}
-        <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 z-[100]">
-          <div className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 shadow-lg" style={{ background: '#f0d7ff' }}>
-            <PillBtn icon={Type} label="Drag to add a text box" cursor="grab" onMouseDown={beginPlace('textbox')} />
-            <PillBtn icon={StickyNote} label="Drag to add a note" cursor="grab" onMouseDown={beginPlace('note')} />
-            <PillBtn icon={Pen} label="Pen tool — draw on page" active={penMode} onClick={() => { setPenMode(v => !v); setToolsOpen(false) }} />
-            <SidebarToggleBtn label="Toggle sidebar" open={sidebarOpen} active={sidebarOpen} onClick={() => setSidebarOpen(v => !v)} />
+        {/* RIGHT — Tool pill (lavender/pink). Toggled via top bar pen icon. */}
+        {penToolsOpen && (
+          <div className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 z-[100]">
+            <div className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 shadow-lg" style={{ background: '#f0d7ff' }}>
+              <PillBtn icon={Type} label="Drag to add a text box" cursor="grab" onMouseDown={beginPlace('textbox')} />
+              <PillBtn icon={StickyNote} label="Drag to add a note" cursor="grab" onMouseDown={beginPlace('note')} />
+              <PillBtn icon={Pen} label="Pen tool — draw on page" active={penMode} onClick={() => setPenMode(v => !v)} />
+              <SidebarToggleBtn label="Toggle sidebar" open={sidebarOpen} active={sidebarOpen} onClick={() => setSidebarOpen(v => !v)} />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Pen drawing sub-bar — opens beside the lavender pill */}
-        {penMode && (
+        {penToolsOpen && penMode && (
           <div className="hidden sm:flex absolute right-[68px] top-1/2 -translate-y-1/2 z-30 flex-col items-center gap-2 rounded-2xl px-2.5 py-3 shadow-lg" style={{ background: '#f0d7ff' }}>
             {/* Color indicator — click to toggle palette */}
             <button onClick={() => setPaletteOpen(v => !v)} title="Pen color"
@@ -1121,7 +1248,7 @@ export default function BookViewerPage() {
         )}
 
         {/* Pen color palette & thickness slider */}
-        {penMode && paletteOpen && (
+        {penToolsOpen && penMode && paletteOpen && (
           <div className="hidden sm:flex absolute right-[128px] top-1/2 -translate-y-1/2 z-40 w-56 flex-col gap-3 rounded-2xl p-3.5 shadow-2xl border border-black/10" style={{ background: '#faf8f0' }}>
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-wider text-brand-dark/50 font-semibold">Pen color</p>
@@ -1196,15 +1323,9 @@ export default function BookViewerPage() {
         </div>
       )}
 
-      {/* Meaning peek card */}
+      {/* Gemini Meaning Peek Card (Sideways & Gradient Styled) */}
       {meaning && (
-        <div data-no-select className="fixed z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl" style={{ left: meaning.x, top: meaning.y, transform: 'translate(-50%, -100%)', background: '#242424' }}>
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[13px] font-semibold text-brand-cream">{meaning.word}</p>
-            <button onClick={() => setMeaning(null)} className="text-white/40 hover:text-white"><X className="h-3.5 w-3.5" /></button>
-          </div>
-          <p className="text-[12px] text-white/60 mt-1 leading-relaxed">{meaning.text}</p>
-        </div>
+        <GeminiMeaningCard meaning={meaning} onClose={() => setMeaning(null)} />
       )}
 
       {/* ━━━━ DRAG-TO-PLACE GHOST (follows the cursor while placing a note/text) ━━━━ */}
@@ -1549,7 +1670,7 @@ const PageView = memo(function PageView({
         const sz = { w: Math.floor(vp.width), h: Math.floor(vp.height) }
         setSize(sz); onSize(pageNum, sz)
 
-        const dpr = window.devicePixelRatio || 1
+        const dpr = Math.min(window.devicePixelRatio || 1, scale > 2.5 ? 1.5 : 2)
         canvas.width = Math.floor(vp.width * dpr); canvas.height = Math.floor(vp.height * dpr)
         canvas.style.width = `${Math.floor(vp.width)}px`; canvas.style.height = `${Math.floor(vp.height)}px`
         const ctx = canvas.getContext('2d')!
@@ -1712,19 +1833,34 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
   // A freshly-created text box drops straight into edit mode so you can type.
   const [editing, setEditing] = useState(!!autoStartEdit)
   const [content, setContent] = useState(note.content)
-  // Local geometry is what we render while dragging — updating it is cheap and
+  const [rotating, setRotating] = useState(false)
+  // Local geometry is what we render while dragging or rotating — updating it is cheap and
   // triggers NO network calls. We persist once on release.
-  const [geom, setGeom] = useState({ x: note.x, y: note.y, width: note.width, height: note.height })
+  const [geom, setGeom] = useState({
+    x: note.x,
+    y: note.y,
+    width: note.width,
+    height: note.height,
+    rotation: note.rotation || 0,
+  })
   const geomRef = useRef(geom)
   // Keep the ref in sync with committed geometry, but never clobber it mid-drag
-  if (!dragging) geomRef.current = geom
+  if (!dragging && !rotating) geomRef.current = geom
   const dragStart = useRef({ x: 0, y: 0, nx: 0, ny: 0, w: 0, h: 0 })
   const ref = useRef<HTMLDivElement>(null)
 
   // Keep local geometry in sync when the server value changes (and we're not mid-drag)
   useEffect(() => {
-    if (!dragging) setGeom({ x: note.x, y: note.y, width: note.width, height: note.height })
-  }, [note.x, note.y, note.width, note.height, dragging])
+    if (!dragging && !rotating) {
+      setGeom({
+        x: note.x,
+        y: note.y,
+        width: note.width,
+        height: note.height,
+        rotation: note.rotation || 0,
+      })
+    }
+  }, [note.x, note.y, note.width, note.height, note.rotation, dragging, rotating])
 
   useEffect(() => {
     setContent(note.content)
@@ -1795,6 +1931,51 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
     window.addEventListener('mouseup', onUp)
   }
 
+  const beginRotate = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onSelect()
+    setRotating(true)
+
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+
+    const onMove = (me: MouseEvent) => {
+      const dx = me.clientX - cx
+      const dy = me.clientY - cy
+      const rad = Math.atan2(dy, dx)
+      // Since handle is above the box (dx=0, dy<0 is -90 deg), add 90 deg so pointing straight up = 0 deg
+      let deg = Math.round(rad * (180 / Math.PI)) + 90
+      if (deg < 0) deg += 360
+      deg = deg % 360
+
+      // Snap to standard 45-degree increments if within 4 degrees
+      for (const snap of [0, 45, 90, 135, 180, 225, 270, 315, 360]) {
+        if (Math.abs(deg - snap) < 4) {
+          deg = snap === 360 ? 0 : snap
+          break
+        }
+      }
+
+      geomRef.current = { ...geomRef.current, rotation: deg }
+      setGeom(prev => ({ ...prev, rotation: deg }))
+    }
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      setRotating(false)
+      const finalDeg = geomRef.current.rotation || 0
+      onUpdate(note.id, { rotation: finalDeg })
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   const finishEdit = () => {
     setEditing(false)
     if (isBox && content.trim() === '') { onDelete(note.id); return } // drop empty boxes
@@ -1843,10 +2024,25 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
         color: note.textColor,
         cursor: editing ? 'default' : (dragging ? 'grabbing' : 'grab'),
         opacity: deleting ? 0 : 1,
-        transform: deleting ? 'scale(0.92)' : undefined,
+        transform: `${deleting ? 'scale(0.92) ' : ''}rotate(${geom.rotation || 0}deg)`,
+        transformOrigin: 'center center',
       }}
       onMouseDown={(e) => beginDrag(e, 'move', false)}
       onClick={onSelect}>
+
+      {/* Rotation handle: small circular knob above the top edge when open to write */}
+      {editing && (
+        <div
+          className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center cursor-grab active:cursor-grabbing z-30 select-none group/rot"
+          onMouseDown={beginRotate}
+          title="Drag to rotate"
+        >
+          <div className="h-5 w-5 rounded-full bg-white border border-brand-teal/80 shadow-md flex items-center justify-center hover:scale-110 hover:bg-brand-teal hover:text-white transition-all text-brand-dark/70">
+            <RotateCw className="h-3 w-3" />
+          </div>
+          <div className="w-px h-2 bg-brand-teal/60" />
+        </div>
+      )}
 
       {/* Header bar: sticky notes have title + trash; textboxes only show drag header when open to write (editing) */}
       {!isBox ? (
@@ -1966,6 +2162,20 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
           {!isBox && (
             <button type="button" onClick={() => onUpdate(note.id, { textColor: note.textColor === '#000000' ? '#FFFFFF' : '#000000' })} className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-black/20 shadow-xs" style={{ background: note.textColor === '#000000' ? '#000' : '#fff', color: note.textColor === '#000000' ? '#fff' : '#000' }} title="Toggle text color">Aa</button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              const nextRot = (((geom.rotation || 0) + 90) % 360)
+              setGeom(prev => ({ ...prev, rotation: nextRot }))
+              geomRef.current = { ...geomRef.current, rotation: nextRot }
+              onUpdate(note.id, { rotation: nextRot })
+            }}
+            className="flex items-center gap-1 text-[11px] font-bold text-black/70 hover:text-black px-1.5 py-0.5 rounded hover:bg-black/5"
+            title="Rotate 90° clockwise"
+          >
+            <RotateCw className="h-3 w-3" />
+            <span className="text-[9px] font-semibold">{geom.rotation || 0}°</span>
+          </button>
           <button type="button" onClick={runDelete} className="ml-1 opacity-60 hover:opacity-100 text-red-600 p-1 rounded hover:bg-red-50" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       )}
@@ -1977,3 +2187,107 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
     </div>
   )
 }
+
+/* ━━━━ Gemini Gradient Meaning Card (Sideways Floating) ━━━━ */
+function GeminiMeaningCard({
+  meaning,
+  onClose,
+}: {
+  meaning: MeaningData
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(`${meaning.word}: ${meaning.text}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div
+      data-no-select
+      className="fixed z-50 w-[320px] sm:w-[350px] animate-in fade-in zoom-in-95 duration-200 select-none shadow-[0_20px_60px_rgba(0,0,0,0.65)]"
+      style={{
+        left: meaning.x,
+        top: meaning.y,
+      }}
+    >
+      <div className="relative p-[1.5px] rounded-2xl bg-gradient-to-br from-[#4285F4] via-[#9B72CF] to-[#FF7582] shadow-xl">
+        <div className="relative rounded-[15px] bg-[#131314]/95 backdrop-blur-2xl p-4 text-white overflow-hidden">
+          {/* Ambient soft glow in the top-right corner */}
+          <div className="pointer-events-none absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-[#4285F4]/20 via-[#9B72CF]/25 to-[#FF7582]/20 blur-2xl" />
+
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-[#4285f4]/15 via-[#9b72cf]/20 to-[#ff7582]/15 border border-[#9b72cf]/35">
+              <Sparkles className="h-3 w-3 text-[#9B72CF] animate-pulse" />
+              <span className="text-[10px] font-semibold bg-gradient-to-r from-[#93C5FD] via-[#D8B4FE] to-[#FCA5A5] bg-clip-text text-transparent uppercase tracking-wider">
+                {meaning.isExplanation ? 'AI Insight' : 'Gemini Dictionary'}
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="h-6 w-6 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors"
+              title="Close"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Word / Title */}
+          <div className="mt-2.5">
+            <h4 className="text-[17px] font-semibold tracking-tight text-white/95 capitalize font-poppins">
+              {meaning.word}
+            </h4>
+          </div>
+
+          {/* Meaning / Text */}
+          <div className="mt-2 text-[13px] text-white/80 leading-relaxed font-light max-h-56 overflow-y-auto pr-1 select-text [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+            {meaning.loading ? (
+              <div className="flex items-center gap-2 py-3 text-white/50 text-[12px]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#9B72CF]" />
+                <span className="animate-pulse bg-gradient-to-r from-[#93C5FD] to-[#D8B4FE] bg-clip-text text-transparent font-medium">
+                  Consulting Gemini AI…
+                </span>
+              </div>
+            ) : (
+              meaning.text
+            )}
+          </div>
+
+          {/* Bottom action row */}
+          {!meaning.loading && (
+            <>
+              <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-3" />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/35 font-mono">
+                  Gemini AI Assistant
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white/70 hover:text-white text-[11px] font-medium transition-all"
+                  title="Copy to clipboard"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3 w-3 text-green-400" />
+                      <span className="text-green-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+

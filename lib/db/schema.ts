@@ -37,6 +37,7 @@ export const stickyNotes = pgTable('sticky_notes', {
   y: real('y').notNull(),
   width: real('width').default(0.2).notNull(),
   height: real('height').default(0.15).notNull(),
+  rotation: real('rotation').default(0),
   bgColor: text('bg_color').default('#FFFF00').notNull(),
   textColor: text('text_color').default('#000000').notNull(),
   fontSize: integer('font_size').default(14).notNull(),

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureStickyNoteRotationColumn } from '@/lib/db'
 import { stickyNotes } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
@@ -8,6 +8,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    await ensureStickyNoteRotationColumn()
     const { id } = await params
     const body = await request.json()
     

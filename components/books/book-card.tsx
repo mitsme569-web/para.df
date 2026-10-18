@@ -116,16 +116,15 @@ export function BookCard({
             )}
           </div>
 
-          <button
+          <span
             className={cn(
               'shrink-0 rounded-lg border px-3 py-1 text-[11px] font-semibold',
-              'transition-all duration-200',
-              'border-white/15 text-white/60 hover:text-white hover:border-white/30 hover:bg-white/[0.06]',
+              'transition-all duration-200 cursor-pointer',
+              'border-white/15 text-white/60 group-hover:text-white group-hover:border-white/30 group-hover:bg-white/[0.06]',
             )}
-            onClick={(e) => e.preventDefault()}
           >
             {isFinished ? 'Read' : 'Continue'}
-          </button>
+          </span>
         </div>
       </div>
     </Link>

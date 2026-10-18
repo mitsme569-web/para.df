@@ -15,3 +15,14 @@ export async function ensureGenreColumn() {
     console.warn('Could not alter table books to add genre column:', err)
   }
 }
+
+let rotationChecked = false
+export async function ensureStickyNoteRotationColumn() {
+  if (rotationChecked) return
+  try {
+    await sql`ALTER TABLE sticky_notes ADD COLUMN IF NOT EXISTS rotation real DEFAULT 0;`
+    rotationChecked = true
+  } catch (err) {
+    console.warn('Could not alter table sticky_notes to add rotation column:', err)
+  }
+}
