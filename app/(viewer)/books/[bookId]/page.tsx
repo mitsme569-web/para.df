@@ -10,6 +10,7 @@ import {
   Save, FolderOpen, MoreVertical, Trash2, GripHorizontal,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { GoogleAILookup } from '@/components/viewer/google-ai-lookup'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import 'pdfjs-dist/web/pdf_viewer.css'
 
@@ -675,6 +676,23 @@ export default function BookViewerPage() {
     }
   }
 
+  const handleAISearch = async (queryText: string) => {
+    if (!meaning) return
+    const { x, y } = meaning
+    setMeaning({ word: queryText, text: 'Thinking…', x, y })
+    try {
+      const res = await fetch('/api/words/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: queryText, bookTitle: book?.title, page: currentPage }),
+      })
+      const data = await res.json()
+      setMeaning({ word: queryText, text: data.explanation || 'No explanation returned.', x, y })
+    } catch {
+      setMeaning({ word: queryText, text: 'Failed to look up query.', x, y })
+    }
+  }
+
   /* ─── Sticky note CRUD ─────────────────────────── */
   const noteSize = (kind: 'note' | 'textbox') =>
     kind === 'textbox' ? { w: 0.25, h: 0.1 } : { w: 0.15, h: 0.2 }
@@ -1196,15 +1214,16 @@ export default function BookViewerPage() {
         </div>
       )}
 
-      {/* Meaning peek card */}
+      {/* Google AI Lookup Card */}
       {meaning && (
-        <div data-no-select className="fixed z-50 w-72 rounded-xl border border-white/10 p-3 shadow-2xl" style={{ left: meaning.x, top: meaning.y, transform: 'translate(-50%, -100%)', background: '#242424' }}>
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[13px] font-semibold text-brand-cream">{meaning.word}</p>
-            <button onClick={() => setMeaning(null)} className="text-white/40 hover:text-white"><X className="h-3.5 w-3.5" /></button>
-          </div>
-          <p className="text-[12px] text-white/60 mt-1 leading-relaxed">{meaning.text}</p>
-        </div>
+        <GoogleAILookup
+          meaning={meaning}
+          bookTitle={book?.title}
+          currentPage={currentPage}
+          bookId={bookId}
+          onClose={() => setMeaning(null)}
+          onSearch={handleAISearch}
+        />
       )}
 
       {/* ━━━━ DRAG-TO-PLACE GHOST (follows the cursor while placing a note/text) ━━━━ */}
