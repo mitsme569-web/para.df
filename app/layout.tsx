@@ -11,8 +11,8 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s · Paradict',
-    default: 'Paradict — Read Deeper, Remember More',
+    template: '%s · paraDF',
+    default: 'paraDF — Read Deeper, Remember More',
   },
   description:
     'Your personal reading companion. Upload books, save words, and build a dictionary that grows with every page you read.',

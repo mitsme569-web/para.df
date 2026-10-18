@@ -49,3 +49,6 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+# Internal handoff notes
+HANDOFF.md

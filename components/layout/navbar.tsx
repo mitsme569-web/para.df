@@ -23,7 +23,7 @@ export function Navbar() {
         <Link href="/books" className="flex items-center gap-2 select-none group">
           <BookMarked className="h-5 w-5 text-brand-cream/90" />
           <span className="text-[15px] font-semibold tracking-tight text-brand-cream/90">
-            Paradict
+            paraDF
           </span>
         </Link>
 
