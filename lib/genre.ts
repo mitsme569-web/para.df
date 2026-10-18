@@ -124,16 +124,6 @@ const GENRE_RULES: GenreRule[] = [
   },
 ]
 
-/**
- * Normalizes a text string for fuzzy token matching
- */
-export type BookGenre = string
-
-interface GenreRule {
-  genre: string
-  keywords: string[]
-}
-
 const EXTENDED_GENRE_RULES: GenreRule[] = [
   {
     genre: 'Technology',
