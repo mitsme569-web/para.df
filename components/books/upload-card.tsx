@@ -35,9 +35,9 @@ export function UploadCard({ onUpload }: UploadCardProps) {
 
       await new Promise((r) => setTimeout(r, 400))
       router.push(`/books/${bookId}`)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload failed:', err)
-      alert('Upload failed. Please try again.')
+      alert(err?.message || 'Upload failed. Please try again.')
       setState('idle')
       setStatus('')
     }

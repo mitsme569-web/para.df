@@ -118,13 +118,51 @@ export function useBooks() {
         return { bookId: dupData.book.id, alreadyExists: true }
       }
 
-      // 3. Upload PDF to storage
+      // 3. Upload PDF to storage (Direct upload via presigned URL to bypass Vercel 4.5MB limit)
       onStatus?.('Uploading PDF...')
-      const pdfForm = new FormData()
-      pdfForm.append('file', file)
-      const pdfRes = await fetch('/api/upload/pdf', { method: 'POST', body: pdfForm })
-      if (!pdfRes.ok) throw new Error('PDF upload failed')
-      const { pdfKey } = await pdfRes.json()
+      let pdfKey = ''
+
+      try {
+        const presignRes = await fetch('/api/upload/pdf/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name }),
+        })
+
+        if (!presignRes.ok) {
+          throw new Error('Presigned URL request failed')
+        }
+
+        const presignData = await presignRes.json()
+        if (!presignData?.signedUrl) {
+          throw new Error('Invalid presigned URL response')
+        }
+
+        const directUploadRes = await fetch(presignData.signedUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/pdf',
+          },
+          body: file,
+        })
+
+        if (!directUploadRes.ok) {
+          throw new Error(`Direct upload failed with status ${directUploadRes.status}`)
+        }
+
+        pdfKey = presignData.pdfKey
+      } catch (directErr) {
+        console.warn('Direct upload failed, falling back to server route:', directErr)
+        const pdfForm = new FormData()
+        pdfForm.append('file', file)
+        const pdfRes = await fetch('/api/upload/pdf', { method: 'POST', body: pdfForm })
+        if (!pdfRes.ok) {
+          const errData = await pdfRes.json().catch(() => null)
+          throw new Error(errData?.error || 'PDF upload failed')
+        }
+        const data = await pdfRes.json()
+        pdfKey = data.pdfKey
+      }
 
       // 4. Page count (load doc metadata only — no canvas render — for speed)
       onStatus?.('Counting pages...')

@@ -8,6 +8,22 @@ const supabase = createClient(
 const BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'pdfs'
 
 /**
+ * Generate a signed upload URL for uploading a PDF directly from the client.
+ * Bypasses serverless body size limits (such as Vercel's 4.5 MB gateway limit).
+ */
+export async function createSignedPdfUploadUrl(key: string): Promise<{ signedUrl: string; token: string; path: string }> {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUploadUrl(key)
+
+  if (error || !data) {
+    throw new Error(`Failed to create signed upload URL: ${error?.message || 'Unknown error'}`)
+  }
+
+  return data
+}
+
+/**
  * Upload a PDF buffer to Supabase Storage.
  * Returns the object key.
  */
