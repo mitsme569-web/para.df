@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight,
   Send, Type, Bold, Underline, Highlighter, Pen, X, Eraser, FileMinus, Undo2, Redo2,
   Save, FolderOpen, MoreVertical, Trash2, GripHorizontal, RotateCw,
-  Sparkles, Copy, Check,
+  Copy, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -325,9 +325,9 @@ export default function BookViewerPage() {
   const [meaning, setMeaning] = useState<MeaningData | null>(null)
 
   const getSidewaysPosition = useCallback((bb?: { left: number; top: number; right: number; bottom: number }) => {
-    const cardW = 350
-    const cardH = 220
-    const margin = 16
+    const cardW = 265
+    const cardH = 175
+    const margin = 12
 
     if (!bb) {
       return {
@@ -753,7 +753,7 @@ export default function BookViewerPage() {
     const sel = selection
     const pos = getSidewaysPosition(sel.boundingRect)
     setSelection(null)
-    setMeaning({ word: 'AI Explanation', text: 'Thinking…', x: pos.x, y: pos.y, isExplanation: true, loading: true })
+    setMeaning({ word: 'Explanation', text: 'Analyzing text…', x: pos.x, y: pos.y, isExplanation: true, loading: true })
     try {
       const res = await fetch('/api/words/explain', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -761,9 +761,9 @@ export default function BookViewerPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Failed to explain passage.')
-      setMeaning({ word: 'AI Explanation', text: data.explanation || 'No explanation returned.', x: pos.x, y: pos.y, isExplanation: true, loading: false })
+      setMeaning({ word: 'Explanation', text: data.explanation || 'No explanation returned.', x: pos.x, y: pos.y, isExplanation: true, loading: false })
     } catch (err) {
-      setMeaning({ word: 'AI Explanation', text: err instanceof Error ? err.message : 'Something went wrong.', x: pos.x, y: pos.y, isExplanation: true, loading: false })
+      setMeaning({ word: 'Explanation', text: err instanceof Error ? err.message : 'Something went wrong.', x: pos.x, y: pos.y, isExplanation: true, loading: false })
     }
   }
 
@@ -1323,9 +1323,9 @@ export default function BookViewerPage() {
         </div>
       )}
 
-      {/* Gemini Meaning Peek Card (Sideways & Gradient Styled) */}
+      {/* Meaning Peek Card (Sideways & Compact Brand Styled) */}
       {meaning && (
-        <GeminiMeaningCard meaning={meaning} onClose={() => setMeaning(null)} />
+        <MeaningCard meaning={meaning} onClose={() => setMeaning(null)} />
       )}
 
       {/* ━━━━ DRAG-TO-PLACE GHOST (follows the cursor while placing a note/text) ━━━━ */}
@@ -1952,14 +1952,6 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
       if (deg < 0) deg += 360
       deg = deg % 360
 
-      // Snap to standard 45-degree increments if within 4 degrees
-      for (const snap of [0, 45, 90, 135, 180, 225, 270, 315, 360]) {
-        if (Math.abs(deg - snap) < 4) {
-          deg = snap === 360 ? 0 : snap
-          break
-        }
-      }
-
       geomRef.current = { ...geomRef.current, rotation: deg }
       setGeom(prev => ({ ...prev, rotation: deg }))
     }
@@ -2030,17 +2022,17 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
       onMouseDown={(e) => beginDrag(e, 'move', false)}
       onClick={onSelect}>
 
-      {/* Rotation handle: small circular knob above the top edge when open to write */}
-      {editing && (
+      {/* Rotation handle: small circular knob above the top edge when active or editing */}
+      {(editing || active) && (
         <div
           className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center cursor-grab active:cursor-grabbing z-30 select-none group/rot"
           onMouseDown={beginRotate}
-          title="Drag to rotate"
+          title="Drag to rotate at any angle"
         >
-          <div className="h-5 w-5 rounded-full bg-white border border-brand-teal/80 shadow-md flex items-center justify-center hover:scale-110 hover:bg-brand-teal hover:text-white transition-all text-brand-dark/70">
+          <div className="h-5 w-5 rounded-full bg-white border border-brand-teal shadow-md flex items-center justify-center hover:scale-110 hover:bg-brand-teal hover:text-white transition-all text-brand-teal">
             <RotateCw className="h-3 w-3" />
           </div>
-          <div className="w-px h-2 bg-brand-teal/60" />
+          <div className="w-px h-2 bg-brand-teal" />
         </div>
       )}
 
@@ -2188,8 +2180,8 @@ function StickyNoteOverlay({ note, active, autoStartEdit, colors, onSelect, onUp
   )
 }
 
-/* ━━━━ Gemini Gradient Meaning Card (Sideways Floating) ━━━━ */
-function GeminiMeaningCard({
+/* ━━━━ Meaning Peek Card (Sideways Floating, Compact Brand Design) ━━━━ */
+function MeaningCard({
   meaning,
   onClose,
 }: {
@@ -2207,87 +2199,72 @@ function GeminiMeaningCard({
   return (
     <div
       data-no-select
-      className="fixed z-50 w-[320px] sm:w-[350px] animate-in fade-in zoom-in-95 duration-200 select-none shadow-[0_20px_60px_rgba(0,0,0,0.65)]"
+      className="fixed z-50 w-[240px] sm:w-[260px] animate-in fade-in zoom-in-95 duration-200 select-none shadow-[0_16px_36px_rgba(0,0,0,0.45)]"
       style={{
         left: meaning.x,
         top: meaning.y,
       }}
     >
-      <div className="relative p-[1.5px] rounded-2xl bg-gradient-to-br from-[#4285F4] via-[#9B72CF] to-[#FF7582] shadow-xl">
-        <div className="relative rounded-[15px] bg-[#131314]/95 backdrop-blur-2xl p-4 text-white overflow-hidden">
-          {/* Ambient soft glow in the top-right corner */}
-          <div className="pointer-events-none absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-[#4285F4]/20 via-[#9B72CF]/25 to-[#FF7582]/20 blur-2xl" />
+      <div className="rounded-xl bg-[#16201e]/95 backdrop-blur-xl border border-brand-teal/40 p-3 text-brand-cream overflow-hidden shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold uppercase tracking-wider bg-brand-teal/30 border border-brand-teal/50 text-brand-cream/90">
+            {meaning.isExplanation ? 'Explanation' : 'Meaning'}
+          </span>
+          <button
+            onClick={onClose}
+            className="h-5 w-5 rounded-full hover:bg-white/10 flex items-center justify-center text-brand-cream/60 hover:text-brand-cream transition-colors"
+            title="Close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-          {/* Header */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-[#4285f4]/15 via-[#9b72cf]/20 to-[#ff7582]/15 border border-[#9b72cf]/35">
-              <Sparkles className="h-3 w-3 text-[#9B72CF] animate-pulse" />
-              <span className="text-[10px] font-semibold bg-gradient-to-r from-[#93C5FD] via-[#D8B4FE] to-[#FCA5A5] bg-clip-text text-transparent uppercase tracking-wider">
-                {meaning.isExplanation ? 'AI Insight' : 'Gemini Dictionary'}
-              </span>
+        {/* Word / Title */}
+        <div className="mt-2">
+          <h4 className="text-[14px] font-semibold tracking-tight text-brand-cream capitalize font-poppins truncate">
+            {meaning.word}
+          </h4>
+        </div>
+
+        {/* Meaning / Text */}
+        <div className="mt-1.5 text-[11.5px] text-brand-cream/80 leading-relaxed font-light max-h-48 overflow-y-auto pr-1 select-text [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+          {meaning.loading ? (
+            <div className="flex items-center gap-2 py-2 text-brand-cream/60 text-[11px]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-cream/70" />
+              <span className="animate-pulse">Loading…</span>
             </div>
-            <button
-              onClick={onClose}
-              className="h-6 w-6 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors"
-              title="Close"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Word / Title */}
-          <div className="mt-2.5">
-            <h4 className="text-[17px] font-semibold tracking-tight text-white/95 capitalize font-poppins">
-              {meaning.word}
-            </h4>
-          </div>
-
-          {/* Meaning / Text */}
-          <div className="mt-2 text-[13px] text-white/80 leading-relaxed font-light max-h-56 overflow-y-auto pr-1 select-text [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
-            {meaning.loading ? (
-              <div className="flex items-center gap-2 py-3 text-white/50 text-[12px]">
-                <Loader2 className="h-4 w-4 animate-spin text-[#9B72CF]" />
-                <span className="animate-pulse bg-gradient-to-r from-[#93C5FD] to-[#D8B4FE] bg-clip-text text-transparent font-medium">
-                  Consulting Gemini AI…
-                </span>
-              </div>
-            ) : (
-              meaning.text
-            )}
-          </div>
-
-          {/* Bottom action row */}
-          {!meaning.loading && (
-            <>
-              <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-3" />
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-white/35 font-mono">
-                  Gemini AI Assistant
-                </span>
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white/70 hover:text-white text-[11px] font-medium transition-all"
-                  title="Copy to clipboard"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-3 w-3 text-green-400" />
-                      <span className="text-green-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </>
+          ) : (
+            meaning.text
           )}
         </div>
+
+        {/* Bottom action row */}
+        {!meaning.loading && (
+          <div className="mt-2.5 pt-2 border-t border-brand-teal/20 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-brand-teal/30 hover:bg-brand-teal/50 border border-brand-teal/40 text-brand-cream/80 hover:text-brand-cream text-[10.5px] font-medium transition-all"
+              title="Copy to clipboard"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3 text-emerald-400" />
+                  <span className="text-emerald-400">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
 }
+
 
