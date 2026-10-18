@@ -1,0 +1,161 @@
+/* ─── Google Fonts ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties ────────────────────────────────── */
+:root {
+  --brand-dark:       #1a1a1a;
+  --brand-teal:       #0d4f46;
+  --brand-teal-mid:   #0f6357;
+  --brand-teal-light: #13796a;
+  --brand-cream:      #ffffeb;
+  --brand-lavender:   #f0d7ff;
+}
+
+/* ─── Base ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--brand-dark);
+  color: var(--brand-cream);
+  font-family: 'Poppins', 'Segoe UI Light', 'Segoe UI', system-ui, sans-serif;
+  min-height: 100dvh;
+  margin: 0;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+/* ─── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(13, 79, 70, 0.5);
+  color: var(--brand-cream);
+}
+
+/* ─── PDF.js text layer (selectable text over canvas) ──────── */
+[data-stage] {
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+[data-page-wrap] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: clip;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: transparent;
+  z-index: 2;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+}
+.textLayer span,
+.textLayer br {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  position: absolute;
+  white-space: pre;
+  cursor: text !important;
+  transform-origin: 0% 0%;
+  -webkit-user-drag: none;
+}
+
+/* Semi-transparent selection that highlights text without turning text white */
+.textLayer ::selection {
+  background: rgba(13, 79, 70, 0.35) !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.textLayer ::-moz-selection {
+  background: rgba(13, 79, 70, 0.35) !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.textLayer span::selection {
+  background: rgba(13, 79, 70, 0.35) !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.textLayer span::-moz-selection {
+  background: rgba(13, 79, 70, 0.35) !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+.textLayer br::selection {
+  background: transparent !important;
+}
+.textLayer br::-moz-selection {
+  background: transparent !important;
+}
+
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
+/* Pen drawing mode */
+.pen-mode-active {
+  cursor: crosshair !important;
+}
+.pen-mode-active [data-page-wrap] {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+.pen-mode-active .textLayer {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+
+
+
+/* ─── Page transition (smooth slide-in when navigating pages) ── */
+@keyframes pageSlideFromRight {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes pageSlideFromLeft {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
