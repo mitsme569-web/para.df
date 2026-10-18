@@ -15,11 +15,24 @@ export default function BooksPage() {
   const [activeGenre, setActiveGenre] = useState<Genre>('All')
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Dynamically build filter list: base default genres + any new custom genres from AI or rules
+  const availableGenres = useMemo(() => {
+    const base: string[] = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Philosophy', 'Biography', 'Classic']
+    const custom = new Set<string>()
+    for (const b of books) {
+      const g = b.genre || classifyBookGenre(b)
+      if (g && !base.some((item) => item.toLowerCase() === g.toLowerCase())) {
+        custom.add(g)
+      }
+    }
+    return [...base, ...Array.from(custom)]
+  }, [books])
+
   // Filter books by active genre (auto-classified or explicit)
   const filtered = useMemo(() => {
     if (activeGenre === 'All') return books
     return books.filter((book) => {
-      const genre = classifyBookGenre(book)
+      const genre = book.genre || classifyBookGenre(book)
       return genre.toLowerCase() === activeGenre.toLowerCase()
     })
   }, [books, activeGenre])
@@ -79,7 +92,7 @@ export default function BooksPage() {
             <p className="font-segoe text-sm text-white/40 font-light">
               Pick up where you left off, or start something new
             </p>
-            <GenreFilter selected={activeGenre} onChange={setActiveGenre} />
+            <GenreFilter selected={activeGenre} onChange={setActiveGenre} genres={availableGenres} />
           </div>
 
           {loading ? (
@@ -115,7 +128,7 @@ export default function BooksPage() {
                     key={book.id}
                     id={book.id}
                     title={book.title}
-                    genre={classifyBookGenre(book)}
+                    genre={book.genre || classifyBookGenre(book)}
                     coverUrl={book.coverUrl}
                     currentPage={book.lastPage}
                     pageCount={book.pageCount}

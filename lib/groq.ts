@@ -67,3 +67,54 @@ export async function groqChat(
   }
   return content.trim()
 }
+
+/**
+ * Classify a book's genre using Groq AI.
+ * If the book fits one of the standard default genres, returns it.
+ * If not, generates a concise custom genre (e.g., "Technology", "Self-Help", "Poetry", etc.).
+ */
+export async function classifyWithAi(
+  title: string,
+  fileName?: string
+): Promise<string | null> {
+  if (!isGroqConfigured()) return null
+  try {
+    const prompt = `Classify this book by genre based on its title and filename:
+Title: "${title}"
+Filename: "${fileName || ''}"
+
+Available standard genres:
+- Fiction
+- Non-Fiction
+- Science
+- History
+- Philosophy
+- Biography
+- Classic
+
+If the book clearly belongs to one of these standard genres, reply with that exact genre name.
+If it does NOT fit any of these standard genres, create a concise, professional 1-2 word new genre category that fits it best (for example: "Self-Help", "Technology", "Poetry", "Psychology", "Business", "Art", "Cookbook", "Drama", "Economics", "Law", "Medicine", etc.).
+
+Reply ONLY with the genre name, nothing else.`
+
+    const res = await groqChat(
+      [
+        { role: 'system', content: 'You are an expert librarian and book genre classifier. Reply only with the genre name.' },
+        { role: 'user', content: prompt }
+      ],
+      { temperature: 0.1, maxTokens: 25 }
+    )
+
+    const cleaned = res.replace(/[^a-zA-Z\s-]/g, '').trim()
+    if (cleaned && cleaned.length <= 25) {
+      return cleaned
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+    }
+    return null
+  } catch (err) {
+    console.warn('AI genre classification error:', err)
+    return null
+  }
+}

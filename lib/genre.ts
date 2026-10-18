@@ -127,6 +127,61 @@ const GENRE_RULES: GenreRule[] = [
 /**
  * Normalizes a text string for fuzzy token matching
  */
+export type BookGenre = string
+
+interface GenreRule {
+  genre: string
+  keywords: string[]
+}
+
+const EXTENDED_GENRE_RULES: GenreRule[] = [
+  {
+    genre: 'Technology',
+    keywords: [
+      'react', 'next.js', 'javascript', 'typescript', 'python', 'rust', 'golang', 'linux',
+      'docker', 'kubernetes', 'aws', 'cloud', 'frontend', 'backend', 'fullstack', 'database',
+      'sql', 'nosql', 'devops', 'cybersecurity', 'hacking', 'network', 'web development'
+    ],
+  },
+  {
+    genre: 'Self-Help',
+    keywords: [
+      'habits', 'atomic habits', 'productivity', 'mindset', 'motivation', 'discipline',
+      'focus', 'goals', 'self improvement', 'confidence', 'routine', 'morning routine',
+      'subtle art', 'procrastination', 'success', 'winning', 'leadership'
+    ],
+  },
+  {
+    genre: 'Psychology',
+    keywords: [
+      'psychology', 'psychological', 'behavior', 'behavioral', 'mental health', 'therapy',
+      'cognitive', 'trauma', 'subconscious', 'freud', 'jung', 'anxiety', 'depression',
+      'emotional intelligence', 'psychiatry', 'neurodivergent'
+    ],
+  },
+  {
+    genre: 'Business',
+    keywords: [
+      'business', 'startup', 'startups', 'marketing', 'sales', 'finance', 'investing',
+      'investor', 'wall street', 'economics', 'entrepreneur', 'entrepreneurship',
+      'venture capital', 'accounting', 'management', 'mba'
+    ],
+  },
+  {
+    genre: 'Poetry',
+    keywords: [
+      'poetry', 'poem', 'poems', 'verse', 'sonnet', 'sonnets', 'anthology', 'poet', 'rhyme'
+    ],
+  },
+  {
+    genre: 'Art',
+    keywords: [
+      'art', 'painting', 'drawing', 'illustration', 'graphic design', 'architecture',
+      'photography', 'sculpture', 'artist', 'visual arts'
+    ],
+  },
+]
+
 function cleanText(text: string): string {
   return text
     .toLowerCase()
@@ -138,27 +193,23 @@ function cleanText(text: string): string {
 /**
  * Classifies a book into one of the standard genres:
  * 'Fiction' | 'Non-Fiction' | 'Science' | 'History' | 'Philosophy' | 'Biography' | 'Classic'
- *
- * Evaluation order:
- * 1. Explicit genre already saved on the record
- * 2. Targeted rule scoring against title & fileName
- * 3. Fallback based on narrative vs instructional signals
+ * OR generates a new specialized genre category if standard ones do not fit.
  */
 export function classifyBookGenre(book: {
   title?: string | null
   fileName?: string | null
   genre?: string | null
 }): BookGenre {
-  // 1. If explicit valid genre is already present, use it
+  // 1. If explicit genre (standard or custom from AI/user) is already present, format and use it
   if (book.genre && book.genre.trim()) {
     const raw = book.genre.trim()
-    const matched = GENRES.find(
-      (g) => g !== 'All' && g.toLowerCase() === raw.toLowerCase()
-    )
-    if (matched && matched !== 'All') return matched as BookGenre
+    return raw
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ')
   }
 
-  // 2. Score title and filename against keyword rules
+  // 2. Score title and filename against standard rules
   const title = book.title || ''
   const fileName = book.fileName || ''
   const combined = cleanText(`${title} ${fileName}`)
@@ -168,17 +219,15 @@ export function classifyBookGenre(book: {
   let bestGenre: BookGenre | null = null
   let highestScore = 0
 
-  for (const rule of GENRE_RULES) {
+  for (const rule of [...GENRE_RULES, ...EXTENDED_GENRE_RULES]) {
     let score = 0
     for (const kw of rule.keywords) {
       const cleanKw = cleanText(kw)
       if (!cleanKw) continue
 
-      // Multi-word phrase match (stronger weight)
       if (cleanKw.includes(' ') && combined.includes(cleanKw)) {
         score += 6
       } else {
-        // Word boundary match
         const regex = new RegExp(`\\b${cleanKw}\\b`, 'i')
         if (regex.test(combined)) {
           score += 2
@@ -197,11 +246,9 @@ export function classifyBookGenre(book: {
   }
 
   // 3. Fallback heuristics
-  // Check for fiction cues
   if (/\b(novel|tale|tales|chronicle|chronicles|secret|curse|blood|shadow|night|warrior)\b/i.test(combined)) {
     return 'Fiction'
   }
 
-  // Default default for PDFs: Non-Fiction
   return 'Non-Fiction'
 }

@@ -155,7 +155,11 @@ export function useBooks() {
         }),
       })
 
-      if (!bookRes.ok) throw new Error('Failed to create book record')
+      if (!bookRes.ok) {
+        const errData = await bookRes.json().catch(() => null)
+        console.error('Create book server error:', errData)
+        throw new Error(errData?.error || 'Failed to create book record')
+      }
       const book = await bookRes.json()
 
       // 6. Refresh list, then kick off cover work WITHOUT awaiting it.
