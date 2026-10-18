@@ -31,7 +31,7 @@ const config: Config = {
         segoe:   ['"Segoe UI"', '"Segoe UI Light"', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {
-        'hero': "url('/images/books-bg.png')",
+        'hero-gradient': 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(13, 79, 70, 0.45), transparent 70%), linear-gradient(180deg, #111817 0%, #0d221f 55%, #0a1f1c 100%)',
       },
       animation: {
         'fade-up':    'fadeUp 0.6s ease-out both',
