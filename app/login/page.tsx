@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ArrowRight, Loader2 } from 'lucide-react'
 
 function MinimalLoginForm() {
@@ -10,7 +10,6 @@ function MinimalLoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [shake, setShake] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const router = useRouter()
   const searchParams = useSearchParams()
   const returnTo = searchParams.get('from') || '/books'
 
@@ -38,8 +37,8 @@ function MinimalLoginForm() {
         throw new Error(data.error || 'Incorrect PIN')
       }
 
-      router.push(returnTo)
-      router.refresh()
+      // Success: navigate to destination
+      window.location.href = returnTo
     } catch (err: any) {
       setError(err?.message || 'Incorrect PIN')
       setShake(true)
