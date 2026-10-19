@@ -38,9 +38,12 @@ export async function ensureAuthRateLimitTables() {
         ip_address TEXT NOT NULL,
         success BOOLEAN NOT NULL DEFAULT false,
         attempted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_auth_attempts_account_time ON auth_attempts (account, attempted_at);
-
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_auth_attempts_account_time ON auth_attempts (account, attempted_at)
+    `
+    await sql`
       CREATE TABLE IF NOT EXISTS account_ips (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         account TEXT NOT NULL,
@@ -48,12 +51,15 @@ export async function ensureAuthRateLimitTables() {
         first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
         last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
         UNIQUE (account, ip_address)
-      );
-      CREATE INDEX IF NOT EXISTS idx_account_ips_account ON account_ips (account);
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_account_ips_account ON account_ips (account)
     `
     authTablesChecked = true
   } catch (err) {
-    console.warn('Could not ensure auth rate limit tables:', err)
+    console.error('Could not ensure auth rate limit tables:', err)
+    throw err
   }
 }
 

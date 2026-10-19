@@ -170,44 +170,58 @@ export class RateLimiterEngine {
  */
 export class PostgresRateLimitStore implements IRateLimitStore {
   async getActiveIps(account: string, since: Date): Promise<string[]> {
-    await ensureAuthRateLimitTables()
-    const rows = await sql`
-      SELECT ip_address
-      FROM account_ips
-      WHERE account = ${account} AND last_seen_at >= ${since}
-      ORDER BY last_seen_at DESC;
-    `
-    return rows.map((r: any) => r.ip_address)
+    try {
+      await ensureAuthRateLimitTables()
+      const rows = await sql`
+        SELECT ip_address
+        FROM account_ips
+        WHERE account = ${account} AND last_seen_at >= ${since}
+        ORDER BY last_seen_at DESC;
+      `
+      return rows.map((r: any) => r.ip_address)
+    } catch (err) {
+      console.error('Error fetching active IPs from Postgres:', err)
+      return []
+    }
   }
 
   async getFailedAttempts(account: string, since: Date): Promise<{ attempted_at: Date }[]> {
-    await ensureAuthRateLimitTables()
-    const rows = await sql`
-      SELECT attempted_at
-      FROM auth_attempts
-      WHERE account = ${account}
-        AND success = false
-        AND attempted_at >= ${since}
-      ORDER BY attempted_at DESC;
-    `
-    return rows.map((r: any) => ({ attempted_at: new Date(r.attempted_at) }))
+    try {
+      await ensureAuthRateLimitTables()
+      const rows = await sql`
+        SELECT attempted_at
+        FROM auth_attempts
+        WHERE account = ${account}
+          AND success = false
+          AND attempted_at >= ${since}
+        ORDER BY attempted_at DESC;
+      `
+      return rows.map((r: any) => ({ attempted_at: new Date(r.attempted_at) }))
+    } catch (err) {
+      console.error('Error fetching failed attempts from Postgres:', err)
+      return []
+    }
   }
 
   async recordAttempt(account: string, ip: string, success: boolean, date: Date = new Date()): Promise<void> {
-    await ensureAuthRateLimitTables()
+    try {
+      await ensureAuthRateLimitTables()
 
-    await sql`
-      INSERT INTO auth_attempts (account, ip_address, success, attempted_at)
-      VALUES (${account}, ${ip}, ${success}, ${date});
-    `
-
-    if (success) {
       await sql`
-        INSERT INTO account_ips (account, ip_address, first_seen_at, last_seen_at)
-        VALUES (${account}, ${ip}, ${date}, ${date})
-        ON CONFLICT (account, ip_address)
-        DO UPDATE SET last_seen_at = ${date};
+        INSERT INTO auth_attempts (account, ip_address, success, attempted_at)
+        VALUES (${account}, ${ip}, ${success}, ${date});
       `
+
+      if (success) {
+        await sql`
+          INSERT INTO account_ips (account, ip_address, first_seen_at, last_seen_at)
+          VALUES (${account}, ${ip}, ${date}, ${date})
+          ON CONFLICT (account, ip_address)
+          DO UPDATE SET last_seen_at = ${date};
+        `
+      }
+    } catch (err) {
+      console.error('Error recording auth attempt in Postgres:', err)
     }
   }
 }
