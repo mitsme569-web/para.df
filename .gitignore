@@ -50,5 +50,7 @@ desktop.ini
 *.sln
 *.sw?
 
-# Internal handoff notes
+# Internal handoff notes & security docs
 HANDOFF.md
+SECURITY.md
+

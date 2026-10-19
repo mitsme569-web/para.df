@@ -68,6 +68,23 @@ export const readingSessions = pgTable('reading_sessions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+// ── Auth Rate Limiting & Allowed IPs ─────────────
+export const authAttempts = pgTable('auth_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  account: text('account').notNull(),
+  ipAddress: text('ip_address').notNull(),
+  success: boolean('success').default(false).notNull(),
+  attemptedAt: timestamp('attempted_at').defaultNow().notNull(),
+})
+
+export const accountIps = pgTable('account_ips', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  account: text('account').notNull(),
+  ipAddress: text('ip_address').notNull(),
+  firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
+  lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+})
+
 // ── Types ────────────────────────────────────────
 export type Book = typeof books.$inferSelect
 export type NewBook = typeof books.$inferInsert
@@ -78,3 +95,7 @@ export type NewStickyNote = typeof stickyNotes.$inferInsert
 export type Word = typeof words.$inferSelect
 export type NewWord = typeof words.$inferInsert
 export type ReadingSession = typeof readingSessions.$inferSelect
+export type AuthAttempt = typeof authAttempts.$inferSelect
+export type NewAuthAttempt = typeof authAttempts.$inferInsert
+export type AccountIp = typeof accountIps.$inferSelect
+export type NewAccountIp = typeof accountIps.$inferInsert

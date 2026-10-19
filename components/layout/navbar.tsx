@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { BookOpen, StickyNote, BookMarked, BarChart3 } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { BookOpen, StickyNote, BookMarked, BarChart3, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -14,6 +14,15 @@ const navItems = [
 
 export function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLock = async () => {
+    try {
+      await fetch('/api/auth/pin', { method: 'DELETE' })
+      router.push('/login')
+      router.refresh()
+    } catch {}
+  }
 
   return (
     <header className="fixed top-8 left-0 right-0 z-50">
@@ -77,8 +86,17 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* ── Right spacer (balances logo) ─────────── */}
-        <div className="w-20 hidden sm:block" />
+        {/* ── Lock Button (Right) ─────────── */}
+        <div className="flex items-center justify-end">
+          <button
+            onClick={handleLock}
+            title="Lock library"
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-full border border-white/10 hover:border-white/25 bg-black/20 hover:bg-black/40 text-white/50 hover:text-white transition-all text-xs cursor-pointer"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            <span className="hidden md:inline text-[11px] font-medium">Lock</span>
+          </button>
+        </div>
 
       </div>
     </header>
